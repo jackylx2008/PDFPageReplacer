@@ -75,10 +75,14 @@ def run(
             raise RuntimeError("use_local_qwen=True 时必须传入 project_root。")
         config = LlamaCppConfig.from_env()
         ai_client = LlamaCppClient(config, project_root=project_root)
-        models = ai_client.ensure_server()
-        ai_client.assert_model_available(models)
-        ai_model = config.model
-        logger.info("启用本地 Qwen AI 判定，模型=%s", ai_model)
+        try:
+            models = ai_client.ensure_server()
+            ai_client.assert_model_available(models)
+            ai_model = config.model
+            logger.info("启用本地 Qwen AI 判定，模型=%s", ai_model)
+        except Exception:
+            ai_client.shutdown_server()
+            raise
     results: list[FileCheckResult] = []
 
     try:

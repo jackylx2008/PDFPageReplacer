@@ -30,6 +30,7 @@ class LlamaCppConfig:
     ctx_size: str
     reasoning: str
     reasoning_budget: str
+    startup_timeout: int
 
     @classmethod
     def from_env(cls) -> "LlamaCppConfig":
@@ -49,6 +50,7 @@ class LlamaCppConfig:
             ctx_size=os.getenv("LLAMACPP_CTX_SIZE", "8192"),
             reasoning=os.getenv("LLAMACPP_REASONING", "off"),
             reasoning_budget=os.getenv("LLAMACPP_REASONING_BUDGET", "0"),
+            startup_timeout=int(os.getenv("LLAMACPP_STARTUP_TIMEOUT", "900")),
         )
 
     def validate_for_use(self) -> None:
@@ -69,10 +71,10 @@ class LlamaCppConfig:
 
 
 class LlamaCppClient:
-    def __init__(self, config: LlamaCppConfig, project_root: Path, timeout: int = 120) -> None:
+    def __init__(self, config: LlamaCppConfig, project_root: Path, timeout: int | None = None) -> None:
         self.config = config
         self.project_root = project_root
-        self.timeout = timeout
+        self.timeout = timeout or config.startup_timeout
         self._started_process: subprocess.Popen[str] | None = None
 
     def ensure_server(self) -> list[str]:
