@@ -67,7 +67,7 @@ LLAMACPP_AUTOSTART=true
 LLAMACPP_SERVER_PATH=D:/path/to/llama-server.exe
 LLAMACPP_MODEL_PATH=C:/path/to/Qwen3.6-27B-Q4_K_M.gguf
 LLAMACPP_MMPROJ_PATH=
-LLAMACPP_EXTRA_DLL_DIRS=./vendor/cuda12
+LLAMACPP_EXTRA_DLL_DIRS=D:/path/to/vendor/cuda12
 LLAMACPP_N_GPU_LAYERS=999
 LLAMACPP_CTX_SIZE=8192
 LLAMACPP_STARTUP_TIMEOUT=900
@@ -77,6 +77,16 @@ LLAMACPP_REASONING_BUDGET=0
 ```
 
 `common.env` and `commen.env` are ignored by Git because they contain local machine paths.
+
+`LLAMACPP_EXTRA_DLL_DIRS` should point to the directory containing the CUDA 12 runtime DLLs used by the local `llama.cpp` build:
+
+```text
+cudart64_12.dll
+cublas64_12.dll
+cublasLt64_12.dll
+```
+
+The path may be outside this repository, for example a shared local `vendor/cuda12` directory.
 
 ## Run
 
@@ -96,6 +106,14 @@ python verify_pdf_filename_content.py --no-local-qwen
 ```
 
 `--no-local-qwen` is only for quick local OCR checks. The normal project workflow should use the local Qwen model.
+
+The same command works from VSCode Code Runner. A verified Code Runner command shape is:
+
+```powershell
+set PYTHONIOENCODING=utf8 && python -u "d:\path\to\PDFPageReplacer\verify_pdf_filename_content.py"
+```
+
+For the verified local setup, `verify_pdf_filename_content.py` starts or connects to the local Qwen model, checks the configured PDF directory, writes logs and result files, and exits normally after processing.
 
 ## Output
 
