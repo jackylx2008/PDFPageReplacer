@@ -16,7 +16,8 @@
 
 输出：
   HTML 保存到 SOURCE_PATH_CONTENT 下。
-  同时将 AI 已确认匹配的 PDF 写入 SOURCE_PATH_CONTENT/pdf_filename_match_confirmations.json，
+  人工确认后，将 HTML 导出的 JSON 保存为
+  SOURCE_PATH_CONTENT/pdf_filename_match_confirmations.json。
   后续 verify_pdf_filename_content.py 会跳过这些已确认文件。
 """
 
@@ -38,9 +39,7 @@ if str(SRC_ROOT) not in sys.path:
 from logging_config import resolve_path_markers, setup_logger
 from pdf_page_replacer.modules.confirmation_store import (
     CONFIRMATION_FILE_NAME,
-    add_confirmed_match,
     load_confirmation_store,
-    save_confirmation_store,
 )
 from pdf_page_replacer.modules.env_loader import load_env_files
 
@@ -65,10 +64,6 @@ def main() -> int:
     source_path.mkdir(parents=True, exist_ok=True)
 
     confirmation_store = load_confirmation_store(source_path)
-    ai_added = _store_ai_confirmed_matches(data, confirmation_store, str(result_json))
-    if ai_added:
-        save_confirmation_store(source_path, confirmation_store)
-
     review_items = _review_items(data)
     html_path = source_path / args.output_name
     html_path.write_text(_render_html(review_items, source_path, result_json, confirmation_store), encoding="utf-8")
@@ -80,7 +75,7 @@ def main() -> int:
                 "source_path": str(source_path),
                 "html_path": str(html_path),
                 "confirmation_json": str(source_path / CONFIRMATION_FILE_NAME),
-                "ai_confirmed_added": ai_added,
+                "existing_confirmed_count": len(confirmation_store.get("confirmed_matches", {})),
                 "review_item_count": len(review_items),
             },
             ensure_ascii=False,
@@ -109,24 +104,6 @@ def _latest_result_json() -> Path:
     if not candidates:
         raise FileNotFoundError(f"未找到 verify 输出 JSON: {output_dir}")
     return candidates[0]
-
-
-def _store_ai_confirmed_matches(data: dict, confirmation_store: dict, source_output_json: str) -> int:
-    added = 0
-    for item in data.get("results", []):
-        if item.get("matched") is True and item.get("ai_matched") is True:
-            changed = add_confirmed_match(
-                confirmation_store,
-                file_name=str(item.get("file_name", "")),
-                expected=str(item.get("expected", "")),
-                confirmed_by="local_qwen",
-                content_number=str(item.get("ai_content_number", "") or item.get("matched_text", "")),
-                reason=str(item.get("ai_reason", "")),
-                source_output_json=source_output_json,
-            )
-            if changed:
-                added += 1
-    return added
 
 
 def _review_items(data: dict) -> list[dict]:

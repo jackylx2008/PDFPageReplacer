@@ -143,6 +143,13 @@ When manually confirmed items are exported from the HTML, save the JSON as `pdf_
 
 The same confirmation JSON is also updated automatically for files that local Qwen has already judged as matched.
 
+`pdf_filename_match_confirmations.json` is treated as a small local database for confirmed matches:
+
+- The first database file is created by `verify_pdf_filename_content.py`.
+- Local Qwen confirmed matches are appended by `verify_pdf_filename_content.py`.
+- Manual confirmations exported from `pdf_filename_manual_review.html` must be saved back to the same JSON file.
+- Existing confirmed records are preserved. Later `verify_pdf_filename_content.py` runs read the JSON first, skip old confirmed PDFs, and only OCR/AI-check PDFs that are not yet recorded.
+
 ## Output
 
 Runtime files are written locally and are not committed:
