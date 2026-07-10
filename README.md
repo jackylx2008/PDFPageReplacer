@@ -16,6 +16,7 @@ PDFPageReplacer is a Python utility project for checking PDF cover/content files
 ```text
 .
 ├── verify_pdf_filename_content.py
+├── generate_pdf_manual_review_html.py
 ├── logging_config.py
 ├── common.env.example
 ├── LOCAL_AI_RUNTIME_SETUP.md
@@ -115,6 +116,33 @@ set PYTHONIOENCODING=utf8 && python -u "d:\path\to\PDFPageReplacer\verify_pdf_fi
 
 For the verified local setup, `verify_pdf_filename_content.py` starts or connects to the local Qwen model, checks the configured PDF directory, writes logs and result files, and exits normally after processing.
 
+## Manual Review HTML
+
+After running `verify_pdf_filename_content.py`, generate an HTML review page from the latest JSON result:
+
+```powershell
+python generate_pdf_manual_review_html.py
+```
+
+Or pass a specific result JSON:
+
+```powershell
+python generate_pdf_manual_review_html.py --result-json "output/pdf_filename_ocr_check/pdf_filename_ocr_check_YYYYMMDD_HHMMSS.json"
+```
+
+The script writes two files under `SOURCE_PATH_CONTENT`:
+
+```text
+pdf_filename_manual_review.html
+pdf_filename_match_confirmations.json
+```
+
+`pdf_filename_manual_review.html` lists unmatched PDFs whose filenames match the supported document-number rules, including `05-03-C2-001.PDF` and `JZ05-00-c2-001.pdf`. Each item has a manual confirmation checkbox, OCR preview, AI judgment fields, and a PDF preview/open link.
+
+When manually confirmed items are exported from the HTML, save the JSON as `pdf_filename_match_confirmations.json` in the same `SOURCE_PATH_CONTENT` directory. The next `verify_pdf_filename_content.py` run reads this confirmation file first and skips confirmed PDFs, so already verified documents are not repeatedly OCRed or sent to the local Qwen model.
+
+The same confirmation JSON is also updated automatically for files that local Qwen has already judged as matched.
+
 ## Output
 
 Runtime files are written locally and are not committed:
@@ -123,6 +151,13 @@ Runtime files are written locally and are not committed:
 log/verify_pdf_filename_content.log
 output/pdf_filename_ocr_check/*.json
 output/pdf_filename_ocr_check/*.csv
+```
+
+Runtime review files written under `SOURCE_PATH_CONTENT` are local working files and should not be committed with source code:
+
+```text
+pdf_filename_manual_review.html
+pdf_filename_match_confirmations.json
 ```
 
 The script exits with code `1` when unmatched files or processing errors exist. This is intentional so automation can detect that manual review is needed.

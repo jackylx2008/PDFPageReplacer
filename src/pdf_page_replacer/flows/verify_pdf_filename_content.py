@@ -10,6 +10,12 @@ from pathlib import Path
 
 from logging_config import get_logger
 from pdf_page_replacer.modules.ai_filename_judge import judge_filename_match
+from pdf_page_replacer.modules.confirmation_store import (
+    add_confirmed_match,
+    get_confirmed_match,
+    load_confirmation_store,
+    save_confirmation_store,
+)
 from pdf_page_replacer.modules.llamacpp_client import LlamaCppClient, LlamaCppConfig
 from pdf_page_replacer.modules.match_utils import extract_identifier_candidates, match_filename_to_text
 from pdf_page_replacer.modules.pdf_ocr import PdfOcrReader
@@ -66,6 +72,8 @@ def run(
     output_dir.mkdir(parents=True, exist_ok=True)
     pdf_files = sorted({path.resolve(): path for path in source_path.glob("*") if path.is_file() and path.suffix.lower() == ".pdf"}.values())
     logger.info("开始校核 PDF 文件名与 OCR 内容，目录=%s，文件数=%s", source_path, len(pdf_files))
+    confirmation_store = load_confirmation_store(source_path)
+    confirmation_store_changed = False
 
     reader = PdfOcrReader(zoom=zoom, preferred_engine=ocr_engine)
     ai_client: LlamaCppClient | None = None
@@ -88,6 +96,29 @@ def run(
     try:
         for index, pdf_path in enumerate(pdf_files, start=1):
             logger.info("处理 PDF %s/%s: %s", index, len(pdf_files), pdf_path.name)
+            confirmed_entry = get_confirmed_match(confirmation_store, pdf_path.name)
+            if confirmed_entry is not None:
+                logger.info("跳过已确认匹配文件: %s，来源=%s", pdf_path.name, confirmed_entry.get("confirmed_by", ""))
+                results.append(
+                    FileCheckResult(
+                        file_name=pdf_path.name,
+                        file_path=str(pdf_path),
+                        matched=True,
+                        expected=str(confirmed_entry.get("expected") or pdf_path.stem),
+                        match_method=f"{confirmed_entry.get('confirmed_by', 'confirmed')}_confirmed",
+                        matched_text=str(confirmed_entry.get("content_number", "")),
+                        page_count_checked=0,
+                        ocr_engines="confirmation_store",
+                        ocr_text_length=0,
+                        ocr_identifier_candidates="",
+                        ocr_preview="",
+                        ai_model=ai_model,
+                        ai_matched=True,
+                        ai_content_number=str(confirmed_entry.get("content_number", "")),
+                        ai_reason=str(confirmed_entry.get("reason", "")),
+                    )
+                )
+                continue
             try:
                 page_results = reader.read_pdf(pdf_path, max_pages=max_pages)
                 ocr_text = "\n".join(page.text for page in page_results)
@@ -127,6 +158,15 @@ def run(
                 )
                 if result.matched:
                     logger.info("匹配成功: %s，方式=%s，AI理由=%s", pdf_path.name, result.match_method, result.ai_reason)
+                    if result.ai_matched is True:
+                        confirmation_store_changed = add_confirmed_match(
+                            confirmation_store,
+                            file_name=result.file_name,
+                            expected=result.expected,
+                            confirmed_by="local_qwen",
+                            content_number=result.ai_content_number,
+                            reason=result.ai_reason,
+                        ) or confirmation_store_changed
                 else:
                     logger.warning(
                         "未匹配: %s，期望=%s，OCR长度=%s，AI理由=%s",
@@ -159,6 +199,9 @@ def run(
     finally:
         if ai_client is not None:
             ai_client.shutdown_server()
+        if confirmation_store_changed:
+            path = save_confirmation_store(source_path, confirmation_store)
+            logger.info("已更新匹配确认库: %s", path)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_json = output_dir / f"pdf_filename_ocr_check_{timestamp}.json"
