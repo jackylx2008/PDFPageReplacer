@@ -16,6 +16,7 @@ tmp/
 vendor/
 pdf_filename_manual_review.html
 pdf_filename_match_confirmations.json
+pdf_filename_unmatched_results.json
 
 COMMON_PROJECT_SKILLS.md
 

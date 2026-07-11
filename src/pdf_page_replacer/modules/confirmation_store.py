@@ -8,10 +8,15 @@ from pathlib import Path
 from typing import Any
 
 CONFIRMATION_FILE_NAME = "pdf_filename_match_confirmations.json"
+UNMATCHED_FILE_NAME = "pdf_filename_unmatched_results.json"
 
 
 def confirmation_path(source_path: Path) -> Path:
     return source_path / CONFIRMATION_FILE_NAME
+
+
+def unmatched_results_path(source_path: Path) -> Path:
+    return source_path / UNMATCHED_FILE_NAME
 
 
 def load_confirmation_store(source_path: Path) -> dict[str, Any]:
@@ -30,6 +35,13 @@ def save_confirmation_store(source_path: Path, store: dict[str, Any]) -> Path:
     store["updated_at"] = _now()
     path = confirmation_path(source_path)
     path.write_text(json.dumps(store, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def save_unmatched_results(source_path: Path, payload: dict[str, Any]) -> Path:
+    payload["updated_at"] = _now()
+    path = unmatched_results_path(source_path)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
 
 

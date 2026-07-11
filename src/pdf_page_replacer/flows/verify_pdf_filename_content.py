@@ -15,6 +15,7 @@ from pdf_page_replacer.modules.confirmation_store import (
     get_confirmed_match,
     load_confirmation_store,
     save_confirmation_store,
+    save_unmatched_results,
 )
 from pdf_page_replacer.modules.llamacpp_client import LlamaCppClient, LlamaCppConfig
 from pdf_page_replacer.modules.match_utils import extract_identifier_candidates, match_filename_to_text
@@ -135,9 +136,16 @@ def run(
                     ai_matched = ai_result.matched
                     ai_content_number = ai_result.normalized_content_number
                     ai_reason = ai_result.reason
-                    matched = ai_result.matched
-                    match_method = "local_qwen"
-                    matched_text = ai_content_number
+                    matched = deterministic_match.matched or ai_result.matched
+                    if ai_result.matched:
+                        match_method = "local_qwen"
+                        matched_text = ai_content_number
+                    elif deterministic_match.matched:
+                        match_method = deterministic_match.method
+                        matched_text = deterministic_match.matched_text
+                    else:
+                        match_method = "local_qwen"
+                        matched_text = ai_content_number
 
                 result = FileCheckResult(
                     file_name=pdf_path.name,
@@ -158,13 +166,13 @@ def run(
                 )
                 if result.matched:
                     logger.info("匹配成功: %s，方式=%s，AI理由=%s", pdf_path.name, result.match_method, result.ai_reason)
-                    if result.ai_matched is True:
+                    if ai_client is not None:
                         confirmation_store_changed = add_confirmed_match(
                             confirmation_store,
                             file_name=result.file_name,
                             expected=result.expected,
-                            confirmed_by="local_qwen",
-                            content_number=result.ai_content_number,
+                            confirmed_by=result.match_method,
+                            content_number=result.ai_content_number or result.matched_text,
                             reason=result.ai_reason,
                         ) or confirmation_store_changed
                 else:
@@ -211,6 +219,19 @@ def run(
 
     unmatched_files = [result for result in results if not result.matched]
     error_count = sum(1 for result in results if result.error)
+    unmatched_json = save_unmatched_results(
+        source_path,
+        {
+            "version": 1,
+            "description": "Latest unmatched PDF filename/content check results for manual review.",
+            "source_path": str(source_path),
+            "source_output_json": str(output_json),
+            "total_files": len(results),
+            "unmatched_count": len(unmatched_files),
+            "error_count": error_count,
+            "unmatched_files": [asdict(result) for result in unmatched_files],
+        },
+    )
     workflow_result = WorkflowResult(
         source_path=str(source_path),
         total_files=len(results),
@@ -222,12 +243,13 @@ def run(
         unmatched_files=unmatched_files,
     )
     logger.info(
-        "校核完成，总数=%s，匹配=%s，未匹配=%s，错误=%s，结果=%s",
+        "校核完成，总数=%s，匹配=%s，未匹配=%s，错误=%s，结果=%s，未匹配清单=%s",
         workflow_result.total_files,
         workflow_result.matched_count,
         workflow_result.unmatched_count,
         workflow_result.error_count,
         output_json,
+        unmatched_json,
     )
     return workflow_result
 

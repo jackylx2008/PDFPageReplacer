@@ -9,7 +9,9 @@ PDFPageReplacer is a Python utility project for checking PDF cover/content files
 - Calls a local Qwen model through a `llama.cpp` OpenAI-compatible API for final filename/content matching.
 - Logs the processing workflow to `log/`.
 - Writes JSON and CSV result files to `output/pdf_filename_ocr_check/`.
+- Writes the latest unmatched list to `SOURCE_PATH_CONTENT/pdf_filename_unmatched_results.json`.
 - Records unmatched files, OCR candidates, OCR preview text, AI model name, AI decision, and AI reason.
+- Treats common OCR confusion of `-C2-`, `-02-`, `-O2-`, and `-CZ-` as the same document-number segment, and tolerates missing leading zeroes in the final serial number such as `-011` recognized as `-11`.
 
 ## Project Structure
 
@@ -143,6 +145,14 @@ When manually confirmed items are exported from the HTML, save the JSON as `pdf_
 
 The same confirmation JSON is also updated automatically for files that local Qwen has already judged as matched.
 
+Files that remain unmatched after a run are also written to:
+
+```text
+pdf_filename_unmatched_results.json
+```
+
+This file is saved under `SOURCE_PATH_CONTENT` and is overwritten on each run with the current unmatched state.
+
 `pdf_filename_match_confirmations.json` is treated as a small local database for confirmed matches:
 
 - The first database file is created by `verify_pdf_filename_content.py`.
@@ -165,6 +175,7 @@ Runtime review files written under `SOURCE_PATH_CONTENT` are local working files
 ```text
 pdf_filename_manual_review.html
 pdf_filename_match_confirmations.json
+pdf_filename_unmatched_results.json
 ```
 
 The script exits with code `1` when unmatched files or processing errors exist. This is intentional so automation can detect that manual review is needed.
