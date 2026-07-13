@@ -13,6 +13,32 @@ PDFPageReplacer is a Python utility project for checking PDF cover/content files
 - Records unmatched files, OCR candidates, OCR preview text, AI model name, AI decision, and AI reason.
 - Treats common OCR confusion of `-C2-`, `-02-`, `-O2-`, and `-CZ-` as the same document-number segment, and tolerates missing leading zeroes in the final serial number such as `-011` recognized as `-11`.
 
+## Document Number Extraction Rules
+
+When a form page contains multiple strings that look like document numbers, do not
+collect every regular-expression match. Select only the value associated with the
+`资料编号` field:
+
+- Prefer the value in the cell immediately to the right of `资料编号`, or the closest
+  value on the same row.
+- Exclude matching numbers in body text, notes, change descriptions, references, and
+  phrases such as `原...号`.
+- Return at most one document number per form page.
+- If the field value is split across OCR lines, join only spatially adjacent fragments
+  in the same field cell before validating it. For example, `JZ-06-00-C2-` and `003`
+  may be joined as `JZ-06-00-C2-003`.
+- After field selection, validate the complete value against one of these strict
+  patterns:
+
+```regex
+^(\d{2})-(\d{2})-(C2)-(\d{3})$
+^(JZ)-(\d{2})-(\d{2})-(C2)-(\d{3})$
+```
+
+When relaxed `C2` OCR handling is explicitly enabled, `02`, `O2`, and `CZ` may be
+accepted as OCR equivalents and normalized to `C2`. All other segments and digit
+counts remain strict.
+
 ## Project Structure
 
 ```text
